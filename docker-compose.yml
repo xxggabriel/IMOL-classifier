@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./data:/app/data
+    command: uvicorn mlops_pipeline.api:app --host 0.0.0.0 --port 8000
+
