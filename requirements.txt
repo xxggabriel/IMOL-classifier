@@ -4,3 +4,6 @@ scikit-learn
 iterative-stratification
 joblib
 openpyxl
+flask
+fastapi
+uvicorn[standard]
