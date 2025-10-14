@@ -4,7 +4,11 @@ from typing import Iterable
 import joblib
 import pandas as pd
 
-from ..config import ARTIFACTS_DIR
+from ..config import (
+    ARTIFACTS_DIR,
+    NUMERIC_FLOAT_FEATURES,
+    NUMERIC_INT_FEATURES,
+)
 from ..utils.io import load_excel, save_excel
 
 
@@ -42,6 +46,22 @@ def predict_file(input_file, output_file):
 def predict_records(records: Iterable[dict]) -> pd.DataFrame:
     """Run inference from an iterable of dictionaries."""
     df = pd.DataFrame(list(records))
+    df = _prepare_input_dataframe(df)
     if df.empty:
         raise ValueError("Nenhum registro fornecido para predição")
     return make_prediction_df(df)
+
+
+def _prepare_input_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize incoming dataframe to align with training data expectations."""
+    if df.empty:
+        return df
+
+    df = df.replace(to_replace=r"^\s*$", value=pd.NA, regex=True)
+
+    numeric_cols = set(NUMERIC_FLOAT_FEATURES) | set(NUMERIC_INT_FEATURES)
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
