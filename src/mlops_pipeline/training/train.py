@@ -11,9 +11,45 @@ from ..config import (
     ARTIFACTS_DIR, DEFAULT_TRAIN_FILE, FASE_COL, OPER_COL, TARGET_FASES,
     CAM_COLS, TEST_SIZE, RANDOM_STATE
 )
-from ..features.transforms import CamLabelGenerator, ensure_list
+from ..features.transforms import parse_cam_token
 from ..models.pipelines import create_training_pipelines
 from ..utils.io import load_excel
+
+
+def _extract_aligned_labels(df_raw: pd.DataFrame) -> pd.DataFrame:
+    """Derive phase and operation labels keeping only operations tied to target phases."""
+    fases, ops = [], []
+    for _, row in df_raw.iterrows():
+        fases_row, ops_row = [], []
+        seen_fases, seen_ops = set(), set()
+        for col in CAM_COLS:
+            token = parse_cam_token(row.get(col))
+            if not token:
+                continue
+            fase_raw = token.get("fase")
+            op_raw = token.get("operacao")
+            if fase_raw is None:
+                continue
+            fase_str = str(fase_raw).strip()
+            if not fase_str.isdigit():
+                continue
+            fase_int = int(fase_str)
+            if fase_int not in TARGET_FASES:
+                continue
+            if fase_int not in seen_fases:
+                seen_fases.add(fase_int)
+                fases_row.append(fase_int)
+            if op_raw is None:
+                continue
+            op_str = str(op_raw).strip()
+            if op_str and op_str not in seen_ops:
+                seen_ops.add(op_str)
+                ops_row.append(op_str)
+        fases.append(fases_row)
+        ops.append(ops_row)
+
+    return pd.DataFrame({FASE_COL: fases, OPER_COL: ops})
+
 
 def run_training(train_path: str | None = None):
     ARTIFACTS_DIR.mkdir(exist_ok=True, parents=True)
@@ -22,22 +58,22 @@ def run_training(train_path: str | None = None):
     print(f"Carregando dados de: {path}")
     df_raw = load_excel(path)
 
-    print("Gerando rotulos a partir dos CAM tokens")
-    label_generator = CamLabelGenerator(cam_cols=CAM_COLS)
-    label_generator.fit(df_raw)
-    df_with_labels = label_generator.transform(df_raw)
+    print("Gerando rotulos a partir dos CAM tokens (sincronizando fases e operacoes)")
+    df_labels = _extract_aligned_labels(df_raw)
 
-    df_with_labels[FASE_COL] = df_with_labels[FASE_COL].apply(ensure_list)
-    df_with_labels[OPER_COL] = df_with_labels[OPER_COL].apply(ensure_list)
-    df_with_labels["LABELS_FASE_FILTRADAS"] = df_with_labels[FASE_COL].apply(
-        lambda f: [int(i) for i in f if str(i).isdigit() and int(i) in TARGET_FASES]
+    def _has_op_phase_overlap(row) -> bool:
+        fases_set = {str(f).strip() for f in row[FASE_COL] if str(f).strip()}
+        return any(str(op).strip() in fases_set for op in row[OPER_COL])
+
+    mask_keep = (
+        ((df_labels[FASE_COL].apply(len) > 0) | (df_labels[OPER_COL].apply(len) > 0))
+        & ~df_labels.apply(_has_op_phase_overlap, axis=1)
     )
-    mask_keep = (df_with_labels["LABELS_FASE_FILTRADAS"].apply(len) > 0) | (df_with_labels[OPER_COL].apply(len) > 0)
     df_raw_filtered = df_raw[mask_keep].copy().reset_index(drop=True)
-    df_labels_filtered = df_with_labels[mask_keep].copy().reset_index(drop=True)
+    df_labels_filtered = df_labels[mask_keep].copy().reset_index(drop=True)
 
     mlb_fase = MultiLabelBinarizer(classes=sorted(list(TARGET_FASES)))
-    Y_fase = mlb_fase.fit_transform(df_labels_filtered["LABELS_FASE_FILTRADAS"])
+    Y_fase = mlb_fase.fit_transform(df_labels_filtered[FASE_COL])
 
     mlb_op = MultiLabelBinarizer()
     Y_op = mlb_op.fit_transform(df_labels_filtered[OPER_COL])
