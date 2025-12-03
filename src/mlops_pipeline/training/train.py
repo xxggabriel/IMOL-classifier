@@ -42,7 +42,12 @@ def _extract_aligned_labels(df_raw: pd.DataFrame) -> pd.DataFrame:
             if op_raw is None:
                 continue
             op_str = str(op_raw).strip()
-            if op_str and op_str not in seen_ops:
+            if not op_str:
+                continue
+            # Ignore operations whose code matches any target phase to keep label spaces distinct.
+            if op_str.isdigit() and int(op_str) in TARGET_FASES:
+                continue
+            if op_str not in seen_ops:
                 seen_ops.add(op_str)
                 ops_row.append(op_str)
         fases.append(fases_row)
