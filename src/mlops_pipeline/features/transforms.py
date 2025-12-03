@@ -31,7 +31,9 @@ def is_empty(x: object) -> bool:
 def parse_cam_token(cam_value: object) -> dict:
     if cam_value is None or (isinstance(cam_value, float) and pd.isna(cam_value)):
         return {}
-    parts = [p for p in str(cam_value).strip().split("|") if p != ""]
+    raw = str(cam_value).strip()
+    # Accept both "|" separated and "[...]" separated formats.
+    parts = [p for p in re.split(r"[|\[\]]+", raw) if p != ""]
     if len(parts) < 3:
         return {}
     def clean(v):
