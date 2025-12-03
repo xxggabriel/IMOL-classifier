@@ -1,1 +1,24 @@
-artifacts/*.joblib # ajuste o .gitignore se já existir
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environments
+.env
+.venv/
+.python-version
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Data and artifacts
+artifacts/
+*.joblib
+*.pkl
+data/*.xlsx
+data/*.csv
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
