@@ -67,6 +67,6 @@ def predict_from_json(payload: List[PartInput]) -> List[PredictResponse]:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Valor inválido de id_peca recebido: {row['id_peca']}",
             ) from exc
-        responses.append(PredictResponse(id_peca=id_peca, fases=fases, operacao=operacao))
+        responses.append(PredictResponse(id_peca=id_peca, fases=operacao, operacao=fases))
 
     return responses
